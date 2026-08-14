@@ -14,6 +14,11 @@ export function DetailsModal({ job, userRole, currentSub, onClaim, onSaveNotes, 
     onClose();
   };
 
+  // Admin Un-Claim Reset Handler
+  const handleUnclaimReset = () => {
+    onSaveNotes(job.id, siteNotes, siteVisitDone, 'AVAILABLE'); // Reset status to AVAILABLE
+  };
+
   return h('div', { className: 'fixed inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto' }, [
     h('div', { className: 'bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-lg w-full space-y-4 text-xs shadow-2xl relative my-8' }, [
       
@@ -45,10 +50,18 @@ export function DetailsModal({ job, userRole, currentSub, onClaim, onSaveNotes, 
         h('div', { className: 'bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-300 leading-relaxed' }, job.scope)
       ]),
 
-      // CLAIM STATUS / CLAIM BUTTON FOR SUBS
+      // CLAIM STATUS / CLAIM BUTTON FOR SUBS / UN-CLAIM FOR ADMIN
       job.status === 'CLAIMED' ? (
-        h('div', { className: 'bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl space-y-1' }, [
-          h('span', { className: 'text-[10px] text-emerald-400 font-bold uppercase block' }, '✓ Claimed & Assigned Subcontractor'),
+        h('div', { className: 'bg-emerald-950/40 border border-emerald-800/40 p-3 rounded-xl space-y-2' }, [
+          h('div', { className: 'flex justify-between items-center' }, [
+            h('span', { className: 'text-[10px] text-emerald-400 font-bold uppercase block' }, '✓ Claimed & Assigned Subcontractor'),
+            
+            // ADMIN UN-ASSIGN / RESET BUTTON
+            userRole === 'admin' && h('button', {
+              onClick: handleUnclaimReset,
+              className: 'bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all'
+            }, '↺ Un-assign / Reset to Queue')
+          ]),
           h('p', { className: 'text-xs text-white font-medium' }, job.claimedBy || 'Assigned Partner')
         ])
       ) : userRole === 'sub' && (
