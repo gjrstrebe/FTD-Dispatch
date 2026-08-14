@@ -78,26 +78,22 @@ export function App() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [subSelectionError, setSubSelectionError] = useState(false);
 
-  // 1. Initialize Firestore Listeners & Seed Default Data if Empty
+  // Initialize Firestore Listeners & Seed Default Data if Empty
   useEffect(() => {
     const unsubAuth = initAuth((user) => {
       if (user) {
-        // Subscribe to Jobs
         subscribeToJobs(loadedJobs => {
           if (loadedJobs.length > 0) {
             setJobs(loadedJobs);
           } else {
-            // Seed initial sample jobs if Firestore is empty
             DEFAULT_JOBS.forEach(j => saveJob(j));
           }
         });
 
-        // Subscribe to Partners
         subscribeToPartners(loadedPartners => {
           if (loadedPartners.length > 0) {
             setPartners(loadedPartners);
             
-            // Restore saved sub or fallback to first active sub
             const savedSubId = localStorage.getItem('ftd_selected_sub_id');
             const matched = loadedPartners.find(p => p.id === savedSubId);
             if (matched) {
@@ -107,12 +103,10 @@ export function App() {
               localStorage.setItem('ftd_selected_sub_id', loadedPartners[0].id);
             }
           } else {
-            // Seed initial sample partners if Firestore is empty
             DEFAULT_SUBS.forEach(s => savePartner(s));
           }
         });
 
-        // Subscribe to Categories
         subscribeToCategories(loadedCats => {
           if (loadedCats.length > 0) {
             setCategories(loadedCats);
@@ -297,27 +291,24 @@ export function App() {
       onClose: () => setShowLeadModal(false) 
     }),
 
-// In js/app.js, inside the selectedJob && h(DetailsModal, { ... }) block:
-
-selectedJob && h(DetailsModal, { 
-  key: 'modal-details',
-  job: selectedJob, 
-  userRole, 
-  currentSub, 
-  onClaim: (job) => { handleClaimJobWithGuard(job); setSelectedJob(null); },
-  onSaveNotes: (jobId, notes, siteDone, newStatus) => {
-    const payload = { id: jobId, siteNotes: notes, siteVisitDone: siteDone };
-    if (newStatus) {
-      payload.status = newStatus;
-      payload.claimedBy = ''; // Clear assigned sub on un-claim
-    }
-    saveJob(payload);
-    setSelectedJob(null);
-  },
-  onDeleteJob: (jobId) => { deleteJobRecord(jobId); setSelectedJob(null); },
-  onClose: () => setSelectedJob(null) 
-})
-
+    selectedJob && h(DetailsModal, { 
+      key: 'modal-details',
+      job: selectedJob, 
+      userRole, 
+      currentSub, 
+      onClaim: (job) => { handleClaimJobWithGuard(job); setSelectedJob(null); },
+      onSaveNotes: (jobId, notes, siteDone, newStatus) => {
+        const payload = { id: jobId, siteNotes: notes, siteVisitDone: siteDone };
+        if (newStatus) {
+          payload.status = newStatus;
+          payload.claimedBy = ''; // Clear assigned sub on un-claim
+        }
+        saveJob(payload);
+        setSelectedJob(null);
+      },
+      onDeleteJob: (jobId) => { deleteJobRecord(jobId); setSelectedJob(null); },
+      onClose: () => setSelectedJob(null) 
+    })
   ]);
 }
 
