@@ -297,16 +297,27 @@ export function App() {
       onClose: () => setShowLeadModal(false) 
     }),
 
-    selectedJob && h(DetailsModal, { 
-      key: 'modal-details',
-      job: selectedJob, 
-      userRole, 
-      currentSub, 
-      onClaim: (job) => { handleClaimJobWithGuard(job); setSelectedJob(null); },
-      onSaveNotes: (jobId, notes, siteDone) => saveJob({ id: jobId, siteNotes: notes, siteVisitDone: siteDone }),
-      onDeleteJob: (jobId) => { deleteJobRecord(jobId); setSelectedJob(null); },
-      onClose: () => setSelectedJob(null) 
-    })
+// In js/app.js, inside the selectedJob && h(DetailsModal, { ... }) block:
+
+selectedJob && h(DetailsModal, { 
+  key: 'modal-details',
+  job: selectedJob, 
+  userRole, 
+  currentSub, 
+  onClaim: (job) => { handleClaimJobWithGuard(job); setSelectedJob(null); },
+  onSaveNotes: (jobId, notes, siteDone, newStatus) => {
+    const payload = { id: jobId, siteNotes: notes, siteVisitDone: siteDone };
+    if (newStatus) {
+      payload.status = newStatus;
+      payload.claimedBy = ''; // Clear assigned sub on un-claim
+    }
+    saveJob(payload);
+    setSelectedJob(null);
+  },
+  onDeleteJob: (jobId) => { deleteJobRecord(jobId); setSelectedJob(null); },
+  onClose: () => setSelectedJob(null) 
+})
+
   ]);
 }
 
