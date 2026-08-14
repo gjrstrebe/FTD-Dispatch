@@ -37,6 +37,31 @@ const DEFAULT_SUBS = [
   { id: 'sub-2', name: 'Precision Finishers LLC', contact: 'Carlos Mendez', phone: '(555) 888-2020', rating: 4.8, completedJobs: 22, status: 'Active', specialties: ['Patch & Repair', 'Taping & Finishing'] }
 ];
 
+const DEFAULT_JOBS = [
+  {
+    id: 'ftd-job-1001',
+    title: 'Miller Residence - Living Room Ceiling',
+    address: '1420 S Glenstone Ave, Springfield, MO',
+    category: 'Patch & Repair',
+    scope: 'Water stain patch, 2 sheets 1/2 inch drywall replacement, tape & Level 4 finish.',
+    estimatedValue: 850,
+    referralFeePct: 8,
+    status: 'AVAILABLE',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'ftd-job-1002',
+    title: 'Commercial Basement Remodel',
+    address: '310 E Walnut St, Springfield, MO',
+    category: 'Commercial',
+    scope: 'Hang and finish 45 boards of 5/8 fire-code drywall. Prime coat required.',
+    estimatedValue: 3400,
+    referralFeePct: 10,
+    status: 'AVAILABLE',
+    createdAt: new Date().toISOString()
+  }
+];
+
 export function App() {
   const [userRole, setUserRole] = useState('sub'); // 'admin' | 'sub'
   const [activeTab, setActiveTab] = useState('queue'); // 'queue' | 'pipeline' | 'subs' | 'analytics'
@@ -53,34 +78,41 @@ export function App() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [subSelectionError, setSubSelectionError] = useState(false);
 
-  // Load saved Sub identity from localStorage on initial boot
-  useEffect(() => {
-    const savedSubId = localStorage.getItem('ftd_selected_sub_id');
-    if (savedSubId && partners.length > 0) {
-      const matched = partners.find(p => p.id === savedSubId);
-      if (matched) setCurrentSub(matched);
-    }
-  }, [partners]);
-
-  // 1. Initialize Firestore Listeners
+  // 1. Initialize Firestore Listeners & Seed Default Data if Empty
   useEffect(() => {
     const unsubAuth = initAuth((user) => {
       if (user) {
-        subscribeToJobs(loadedJobs => setJobs(loadedJobs));
+        // Subscribe to Jobs
+        subscribeToJobs(loadedJobs => {
+          if (loadedJobs.length > 0) {
+            setJobs(loadedJobs);
+          } else {
+            // Seed initial sample jobs if Firestore is empty
+            DEFAULT_JOBS.forEach(j => saveJob(j));
+          }
+        });
+
+        // Subscribe to Partners
         subscribeToPartners(loadedPartners => {
           if (loadedPartners.length > 0) {
             setPartners(loadedPartners);
             
-            // Auto-restore saved sub profile or keep null until selected
+            // Restore saved sub or fallback to first active sub
             const savedSubId = localStorage.getItem('ftd_selected_sub_id');
             const matched = loadedPartners.find(p => p.id === savedSubId);
             if (matched) {
               setCurrentSub(matched);
+            } else {
+              setCurrentSub(loadedPartners[0]);
+              localStorage.setItem('ftd_selected_sub_id', loadedPartners[0].id);
             }
           } else {
+            // Seed initial sample partners if Firestore is empty
             DEFAULT_SUBS.forEach(s => savePartner(s));
           }
         });
+
+        // Subscribe to Categories
         subscribeToCategories(loadedCats => {
           if (loadedCats.length > 0) {
             setCategories(loadedCats);
@@ -101,9 +133,6 @@ export function App() {
       setCurrentSub(found);
       localStorage.setItem('ftd_selected_sub_id', found.id);
       setSubSelectionError(false);
-    } else {
-      setCurrentSub(null);
-      localStorage.removeItem('ftd_selected_sub_id');
     }
   };
 
