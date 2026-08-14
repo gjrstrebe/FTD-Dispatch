@@ -64,7 +64,7 @@ const DEFAULT_JOBS = [
 
 export function App() {
   const [userRole, setUserRole] = useState('sub'); // 'admin' | 'sub'
-  const [activeTab, setActiveTab] = useState('queue'); // 'queue' | 'pipeline' | 'subs' | 'analytics'
+  const [activeTab, setActiveTab] = useState('queue'); // 'queue' | 'my-claims' | 'pipeline' | 'subs' | 'analytics'
   
   // Data States
   const [jobs, setJobs] = useState([]);
@@ -162,6 +162,9 @@ export function App() {
     return false;
   };
 
+  // Filter Jobs Claimed by Currently Selected Sub
+  const myClaimedJobs = jobs.filter(j => j.status === 'CLAIMED' && j.claimedBy === currentSub?.name);
+
   return h('div', { className: 'min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans' }, [
     
     // HEADER BAR
@@ -228,6 +231,11 @@ export function App() {
             className: `flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${activeTab === 'queue' ? 'bg-slate-800 text-amber-400 border border-slate-700' : 'text-slate-400'}`
           }, `⚡ Live FCFS Queue (${jobs.filter(j => j.status === 'AVAILABLE').length})`),
 
+          userRole === 'sub' && h('button', {
+            onClick: () => setActiveTab('my-claims'),
+            className: `flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${activeTab === 'my-claims' ? 'bg-slate-800 text-emerald-400 border border-slate-700' : 'text-slate-400'}`
+          }, `📌 My Claimed Jobs (${myClaimedJobs.length})`),
+
           userRole === 'admin' && h('button', {
             onClick: () => setActiveTab('pipeline'),
             className: `flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${activeTab === 'pipeline' ? 'bg-slate-800 text-amber-400 border border-slate-700' : 'text-slate-400'}`
@@ -248,6 +256,8 @@ export function App() {
 
     // MAIN VIEW ROUTER
     h('main', { key: 'main', className: 'flex-1 max-w-7xl w-full mx-auto px-4 py-6' }, [
+      
+      // 1. LIVE QUEUE
       activeTab === 'queue' && h(JobQueue, { 
         jobs, 
         categories, 
@@ -257,6 +267,53 @@ export function App() {
         onClaimJob: handleClaimJobWithGuard 
       }),
 
+      // 2. MY CLAIMED JOBS (SUB PORTAL VIEW)
+      activeTab === 'my-claims' && userRole === 'sub' && h('div', { className: 'space-y-4' }, [
+        h('div', { className: 'flex justify-between items-center pb-2 border-b border-slate-800' }, [
+          h('div', null, [
+            h('h2', { className: 'text-lg font-bold text-white' }, `Claimed Jobs for ${currentSub?.name || 'Selected Sub'}`),
+            h('p', { className: 'text-xs text-slate-400' }, 'Review your active claimed leads, addresses, and site inspection notes anytime.')
+          ]),
+          h('span', { className: 'text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-bold' }, `${myClaimedJobs.length} Active Jobs`)
+        ]),
+
+        myClaimedJobs.length === 0 
+          ? h('div', { className: 'text-center py-12 bg-slate-900/40 rounded-2xl border border-slate-800' }, [
+              h('p', { className: 'text-sm text-slate-400' }, 'You haven\'t claimed any jobs yet!'),
+              h('button', {
+                onClick: () => setActiveTab('queue'),
+                className: 'mt-3 bg-amber-500 text-slate-950 font-black px-4 py-2 rounded-xl text-xs'
+              }, 'Go to Live Queue →')
+            ])
+          : h('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' }, 
+              myClaimedJobs.map(job => 
+                h('div', { 
+                  key: job.id, 
+                  onClick: () => setSelectedJob(job),
+                  className: 'bg-slate-900 border border-emerald-500/40 hover:border-emerald-400 p-4 rounded-2xl space-y-3 cursor-pointer shadow-lg transition-all group' 
+                }, [
+                  h('div', { className: 'flex justify-between items-start' }, [
+                    h('span', { className: 'text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30 uppercase' }, job.category || 'Drywall'),
+                    h('span', { className: 'text-xs font-black text-emerald-400 font-mono' }, `$${(job.estimatedValue || 0).toLocaleString()}`)
+                  ]),
+                  h('h3', { className: 'text-sm font-bold text-white group-hover:text-emerald-300 transition-colors' }, job.title),
+                  h('p', { className: 'text-xs text-slate-400' }, job.address),
+                  
+                  job.siteNotes && h('div', { className: 'bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300' }, [
+                    h('strong', { className: 'text-amber-400 block mb-0.5' }, 'Inspector Notes:'),
+                    job.siteNotes
+                  ]),
+
+                  h('div', { className: 'pt-2 border-t border-slate-800 flex justify-between items-center text-xs' }, [
+                    h('span', { className: 'text-emerald-400 font-bold group-hover:underline' }, 'Tap to View Full Notes →'),
+                    h('span', { className: 'text-[10px] text-slate-500' }, '✓ Claimed')
+                  ])
+                ])
+              )
+            )
+      ]),
+
+      // 3. DISPATCH PIPELINE (ADMIN)
       activeTab === 'pipeline' && userRole === 'admin' && h(LeadPipeline, { 
         jobs, 
         onSelectJob: setSelectedJob, 
@@ -264,6 +321,7 @@ export function App() {
         onDeleteJob: deleteJobRecord 
       }),
 
+      // 4. PARTNER NETWORK
       activeTab === 'subs' && h(SubManager, { 
         partners, 
         userRole, 
@@ -271,6 +329,7 @@ export function App() {
         onDeletePartner: deletePartnerRecord 
       }),
 
+      // 5. REVENUE ANALYTICS (ADMIN)
       activeTab === 'analytics' && userRole === 'admin' && h(Analytics, { jobs })
     ]),
 
@@ -301,7 +360,7 @@ export function App() {
         const payload = { id: jobId, siteNotes: notes, siteVisitDone: siteDone };
         if (newStatus) {
           payload.status = newStatus;
-          payload.claimedBy = ''; // Clear assigned sub on un-claim
+          payload.claimedBy = ''; 
         }
         saveJob(payload);
         setSelectedJob(null);
