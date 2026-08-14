@@ -51,6 +51,16 @@ export function App() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [subSelectionError, setSubSelectionError] = useState(false);
+
+  // Load saved Sub identity from localStorage on initial boot
+  useEffect(() => {
+    const savedSubId = localStorage.getItem('ftd_selected_sub_id');
+    if (savedSubId && partners.length > 0) {
+      const matched = partners.find(p => p.id === savedSubId);
+      if (matched) setCurrentSub(matched);
+    }
+  }, [partners]);
 
   // 1. Initialize Firestore Listeners
   useEffect(() => {
@@ -60,9 +70,14 @@ export function App() {
         subscribeToPartners(loadedPartners => {
           if (loadedPartners.length > 0) {
             setPartners(loadedPartners);
-            if (!currentSub) setCurrentSub(loadedPartners[0]);
+            
+            // Auto-restore saved sub profile or keep null until selected
+            const savedSubId = localStorage.getItem('ftd_selected_sub_id');
+            const matched = loadedPartners.find(p => p.id === savedSubId);
+            if (matched) {
+              setCurrentSub(matched);
+            }
           } else {
-            // Seed Default Partners if Firestore is empty
             DEFAULT_SUBS.forEach(s => savePartner(s));
           }
         });
@@ -70,7 +85,6 @@ export function App() {
           if (loadedCats.length > 0) {
             setCategories(loadedCats);
           } else {
-            // Seed Default Categories if Firestore is empty
             DEFAULT_CATEGORIES.forEach(c => saveCategory(c.name));
           }
         });
@@ -79,6 +93,30 @@ export function App() {
 
     return () => unsubAuth && unsubAuth();
   }, []);
+
+  // Sub Switcher Handler with LocalStorage Persistence
+  const handleSelectSub = (subId) => {
+    const found = partners.find(p => p.id === subId);
+    if (found) {
+      setCurrentSub(found);
+      localStorage.setItem('ftd_selected_sub_id', found.id);
+      setSubSelectionError(false);
+    } else {
+      setCurrentSub(null);
+      localStorage.removeItem('ftd_selected_sub_id');
+    }
+  };
+
+  // Safe Job Claim Guard
+  const handleClaimJobWithGuard = (job) => {
+    if (!currentSub) {
+      setSubSelectionError(true);
+      alert('⚠️ Please select your Sub Company from the top dropdown before claiming this job!');
+      return;
+    }
+    claimJob(job.id, currentSub);
+    setSubSelectionError(false);
+  };
 
   // Handle Admin Role Switch Security
   const handleRoleSwitch = (targetRole) => {
@@ -122,8 +160,9 @@ export function App() {
           }, userRole === 'admin' ? 'Lock Admin' : 'Admin Login')
         ]),
 
-        // Controls (Role Toggle, Sub Switcher, Post Lead)
-        h('div', { className: 'flex items-center gap-3 w-full sm:w-auto justify-end' }, [
+        // Controls (Role Toggle, Sub Identity Selector, Post Lead)
+        h('div', { className: 'flex items-center gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap' }, [
+          
           h('div', { className: 'bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center text-xs' }, [
             h('button', {
               onClick: () => handleRoleSwitch('sub'),
@@ -135,11 +174,21 @@ export function App() {
             }, 'FTD Admin')
           ]),
 
-          userRole === 'sub' && partners.length > 0 && h('select', {
-            value: currentSub?.id || '',
-            onChange: (e) => setCurrentSub(partners.find(p => p.id === e.target.value)),
-            className: 'bg-slate-800 border border-slate-700 text-xs rounded-xl px-2.5 py-2 text-slate-200 hidden lg:block'
-          }, partners.map(p => h('option', { key: p.id, value: p.id }, `📱 Sub: ${p.name}`))),
+          // Sub Profile Dropdown in Navigation
+          userRole === 'sub' && h('div', { className: 'relative' }, [
+            h('select', {
+              value: currentSub?.id || '',
+              onChange: (e) => handleSelectSub(e.target.value),
+              className: `bg-slate-950 border text-xs rounded-xl px-3 py-2 text-slate-200 font-semibold focus:outline-none ${
+                subSelectionError 
+                  ? 'border-red-500 text-red-400 animate-bounce' 
+                  : 'border-amber-500/50 text-amber-300'
+              }`
+            }, [
+              h('option', { value: '', disabled: true }, '📱 Select Your Sub Company...'),
+              partners.map(p => h('option', { key: p.id, value: p.id }, `📱 Sub: ${p.name}`))
+            ])
+          ]),
 
           userRole === 'admin' && h('button', {
             onClick: () => setShowLeadModal(true),
@@ -182,7 +231,7 @@ export function App() {
         userRole, 
         currentSub, 
         onSelectJob: setSelectedJob, 
-        onClaimJob: (job) => claimJob(job.id, currentSub) 
+        onClaimJob: handleClaimJobWithGuard 
       }),
 
       activeTab === 'pipeline' && userRole === 'admin' && h(LeadPipeline, { 
@@ -224,7 +273,7 @@ export function App() {
       job: selectedJob, 
       userRole, 
       currentSub, 
-      onClaim: (job) => { claimJob(job.id, currentSub); setSelectedJob(null); },
+      onClaim: (job) => { handleClaimJobWithGuard(job); setSelectedJob(null); },
       onSaveNotes: (jobId, notes, siteDone) => saveJob({ id: jobId, siteNotes: notes, siteVisitDone: siteDone }),
       onDeleteJob: (jobId) => { deleteJobRecord(jobId); setSelectedJob(null); },
       onClose: () => setSelectedJob(null) 
